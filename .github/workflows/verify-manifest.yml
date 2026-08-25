@@ -1,0 +1,50 @@
+name: Verify hash-only manifest
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-manifest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify bootstrap or immutable authorization
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            python3 -m py_compile scripts/verify_manifest.py
+
+            grep -Fxq \
+              'POLICY = "ci-fabric-privileged-v1"' \
+              scripts/verify_manifest.py
+
+            echo 'CI_FABRIC_PUBLIC_GATE_BASELINE=PASS'
+            exit 0
+          fi
+
+          git cat-file -e "${BASE_SHA}^{commit}"
+
+          python3 scripts/verify_manifest.py \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA"
