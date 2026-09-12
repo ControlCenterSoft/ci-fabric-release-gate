@@ -1,0 +1,41 @@
+name: Build real wallpaper pack
+on:
+  push:
+    branches: [wallpaper-pack-20260912]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: wallpaper-pack-20260912
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Pillow
+        run: pip install pillow
+      - name: Download public wallpaper collections
+        shell: bash
+        run: |
+          mkdir -p sources
+          git clone --depth 1 https://github.com/mylinuxforwork/wallpaper.git sources/ml4w
+          git clone --depth 1 https://github.com/sayimburak/wallpapers.git sources/sayimburak
+          git clone --depth 1 https://github.com/usman-369/wallpapers.git sources/usman
+          git clone --depth 1 https://github.com/michaelScopic/Wallpapers.git sources/michael
+          git clone --depth 1 https://github.com/kitsunebishi/Wallpapers.git sources/kitsunebishi
+          git clone --depth 1 https://github.com/0xl30/4k-wallpapers.git sources/0xl30
+      - name: Select, crop and resize 500 real wallpapers
+        run: python tools/wallpaper_pack.py
+      - name: Validate output
+        shell: bash
+        run: |
+          test "$(find output -type f -name '*.jpg' | wc -l)" -eq 500
+          du -sh output
+      - name: Upload wallpaper archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wallpapers_500_2560x1440
+          path: output/
+          compression-level: 0
+          retention-days: 1
